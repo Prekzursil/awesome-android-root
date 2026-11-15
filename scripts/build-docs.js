@@ -32,14 +32,12 @@ const INDEX_MD_PATH = path.join(APPS_MODULES_DIR, 'index.md');
 if (!fs.existsSync(DOCS_DIR)) handleError("'docs' directory not found.");
 if (!fs.existsSync(README_PATH)) handleError("'README.md' not found.");
 
-// 2. Create apps-and-modules directory if it doesn't exist
-if (!fs.existsSync(APPS_MODULES_DIR)) {
-    try {
-        fs.mkdirSync(APPS_MODULES_DIR, { recursive: true });
-        logInfo("Created docs/apps-and-modules directory");
-    } catch (err) {
-        handleError(`Failed creating apps-and-modules directory: ${err.message}`);
-    }
+// 2. Ensure apps-and-modules directory exists (recursive mkdir is idempotent and race-free)
+try {
+    fs.mkdirSync(APPS_MODULES_DIR, { recursive: true });
+    logInfo("Ensured docs/apps-and-modules directory exists");
+} catch (err) {
+    handleError(`Failed creating apps-and-modules directory: ${err.message}`);
 }
 
 // 3. Filter README.md content
@@ -77,8 +75,13 @@ try {
     const filteredReadme = filterReadme(readmeContent);
 
     let finalContent = '';
-    if (fs.existsSync(INDEX_MD_PATH)) {
-        const existingContent = fs.readFileSync(INDEX_MD_PATH, 'utf8');
+    let existingContent = null;
+    try {
+        existingContent = fs.readFileSync(INDEX_MD_PATH, 'utf8');
+    } catch (err) {
+        if (err.code !== 'ENOENT') throw err;
+    }
+    if (existingContent !== null) {
         finalContent = existingContent + '\n\n' + filteredReadme;
         logInfo("Appended filtered README.md content to existing docs/apps-and-modules/index.md");
     } else {
